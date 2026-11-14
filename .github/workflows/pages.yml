@@ -1,0 +1,43 @@
+name: Deploy site to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rebuild binary media from base64 parts
+        run: |
+          set -e
+          mkdir -p _site
+          cp -r site/. _site/
+          if [ -d media-b64 ]; then
+            for d in $(find media-b64 -name '*.b64.000' | sed 's/\.b64\.000$//' | sort); do
+              out="_site/${d#media-b64/}"
+              mkdir -p "$(dirname "$out")"
+              cat "$d".b64.* | base64 -d > "$out"
+            done
+          fi
+          touch _site/.nojekyll
+          find _site -type f | wc -l
+          du -sh _site
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
